@@ -23,6 +23,8 @@ const STATUS = {
   DELIVERED: "Barang tiba"
 };
 
+const ACTIVE_SHIPMENT_KEY = "shipsandbox.activeShipmentId";
+
 const nextStatus = (s) => ({
   CREATED: "PROCESSING",
   PROCESSING: "IN_TRANSIT",
@@ -45,14 +47,26 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  const persistSelected = (shipment) => {
+    setSelected(shipment);
+    if (shipment?._id) localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(shipment._id));
+  };
+
   const load = async () => {
     const r = await fetch("/api/v1/shipments");
     if (!r.ok) return;
     const j = await r.json();
-    setShipments(j.data || []);
-    if (selected) {
-      const fresh = (j.data || []).find(x => x.trackingNumber === selected.trackingNumber);
-      if (fresh) setSelected(fresh);
+    const data = j.data || [];
+    setShipments(data);
+    const storedId = localStorage.getItem(ACTIVE_SHIPMENT_KEY);
+    const currentId = selected?._id || storedId;
+    const fresh = data.find(x => String(x._id) === String(currentId));
+    if (fresh) {
+      setSelected(fresh);
+      if (fresh._id) localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(fresh._id));
+    } else if (storedId) {
+      localStorage.removeItem(ACTIVE_SHIPMENT_KEY);
+      setSelected(null);
     }
   };
 
@@ -79,15 +93,15 @@ function App() {
     const j = await r.json();
     setBusy(false);
     if (!r.ok) return setMessage(j.error || "Failed to create shipment");
-    setSelected(j.data);
-    setMessage("Shipment created.");
+    persistSelected(j.data);
+    setMessage("Shipment created. Active shipment saved in this browser.");
     load();
   };
 
   const advance = async (trackingNumber) => {
     const r = await fetch(`/api/v1/shipments/${trackingNumber}/advance`, {method:"POST"});
     const j = await r.json();
-    if (r.ok) { setSelected(j.data); load(); }
+    if (r.ok) { persistSelected(j.data); load(); }
     else setMessage(j.error || "Unable to advance shipment");
   };
 
