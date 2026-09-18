@@ -13,6 +13,7 @@ app.use(express.json({ limit: "20kb" }));
 
 const sanitize = s => s ? String(s).trim() : "";
 const publicShipment = s => ({
+  _id: s._id,
   id: s._id,
   trackingNumber: s.trackingNumber,
   courier: s.courier,

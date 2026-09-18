@@ -49,7 +49,8 @@ function App() {
 
   const persistSelected = (shipment) => {
     setSelected(shipment);
-    if (shipment?._id) localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(shipment._id));
+    const sid = shipment?.id || shipment?._id;
+    if (sid) localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(sid));
   };
 
   const load = async () => {
@@ -59,8 +60,8 @@ function App() {
     const data = j.data || [];
     setShipments(data);
     const storedId = localStorage.getItem(ACTIVE_SHIPMENT_KEY);
-    const currentId = selected?._id || storedId;
-    const fresh = data.find(x => String(x._id) === String(currentId));
+    const currentId = selected?.id || selected?._id || storedId;
+    const fresh = data.find(x => String(x.id || x._id) === String(currentId));
     if (fresh) {
       setSelected(fresh);
       if (fresh._id) localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(fresh._id));
