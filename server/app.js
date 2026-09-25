@@ -37,7 +37,7 @@ app.get("/api/v1/shipments", async (_, res) => {
   try {
     await connectDB();
     const docs = await Shipment.find().sort({ createdAt: -1 }).limit(50).lean();
-    res.json({ success: true, data: docs });
+    res.json({ success: true, data: docs.map(publicShipment) });
   } catch (e) { res.status(500).json({ success:false, error:"Database error" }); }
 });
 

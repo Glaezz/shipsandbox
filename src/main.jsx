@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
@@ -32,6 +32,8 @@ const nextStatus = (s) => ({
   OUT_FOR_DELIVERY: "DELIVERED"
 }[s]);
 
+const getShipmentId = (s) => s?.id || s?._id;
+
 function App() {
   const [shipments, setShipments] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -46,25 +48,30 @@ function App() {
   const [auto, setAuto] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const loadSeqRef = useRef(0);
 
   const persistSelected = (shipment) => {
     setSelected(shipment);
-    const sid = shipment?.id || shipment?._id;
+    const sid = getShipmentId(shipment);
     if (sid) localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(sid));
+    return sid;
   };
 
-  const load = async () => {
+  const load = async (preferredId) => {
+    const seq = ++loadSeqRef.current;
     const r = await fetch("/api/v1/shipments");
     if (!r.ok) return;
+    if (seq !== loadSeqRef.current) return;
     const j = await r.json();
     const data = j.data || [];
     setShipments(data);
     const storedId = localStorage.getItem(ACTIVE_SHIPMENT_KEY);
-    const currentId = selected?.id || selected?._id || storedId;
-    const fresh = data.find(x => String(x.id || x._id) === String(currentId));
+    const currentId = preferredId || storedId;
+    if (!currentId) return;
+    const fresh = data.find(x => String(getShipmentId(x)) === String(currentId));
     if (fresh) {
       setSelected(fresh);
-      if (fresh._id) localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(fresh._id));
+      localStorage.setItem(ACTIVE_SHIPMENT_KEY, String(getShipmentId(fresh)));
     } else if (storedId) {
       localStorage.removeItem(ACTIVE_SHIPMENT_KEY);
       setSelected(null);
@@ -94,15 +101,15 @@ function App() {
     const j = await r.json();
     setBusy(false);
     if (!r.ok) return setMessage(j.error || "Failed to create shipment");
-    persistSelected(j.data);
+    const id = persistSelected(j.data);
     setMessage("Shipment created. Active shipment saved in this browser.");
-    load();
+    load(id);
   };
 
   const advance = async (trackingNumber) => {
     const r = await fetch(`/api/v1/shipments/${trackingNumber}/advance`, {method:"POST"});
     const j = await r.json();
-    if (r.ok) { persistSelected(j.data); load(); }
+    if (r.ok) { const id = persistSelected(j.data); load(id); }
     else setMessage(j.error || "Unable to advance shipment");
   };
 
@@ -146,7 +153,7 @@ function App() {
         </section>
 
         <section className="panel">
-          <div className="panel-title"><div><span className="kicker">02 / CONTROL</span><h2>Shipment simulator</h2></div><button className="ghost" onClick={load}>↻ Refresh</button></div>
+          <div className="panel-title"><div><span className="kicker">02 / CONTROL</span><h2>Shipment simulator</h2></div><button className="ghost" onClick={()=>load()}>↻ Refresh</button></div>
           {!selected ? <div className="empty">Create a shipment to start the simulator.</div> : <div>
             <div className="tracking"><div><span>{selected.courier}</span><code>{selected.trackingNumber}</code></div><button className="copy" onClick={()=>navigator.clipboard.writeText(endpoint)}>Copy API</button></div>
             <div className="endpoint"><span>GET</span><code>{endpoint}</code></div>
